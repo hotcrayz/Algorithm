@@ -1,0 +1,303 @@
+#define _CRT_SECURE_NO_WARNINGS
+#define TOTAL_WORD 37
+#define EXTRACT_WORD 12
+#define MAX_WORD 1000
+#define PROCESS 2
+
+#include<stdio.h>
+#include<string.h>
+
+FILE *fin;
+FILE *fout;
+
+typedef struct _word Word;
+struct _word
+{
+	char wor[TOTAL_WORD];
+	int proba;
+	int key;
+};
+
+Word word[TOTAL_WORD][PROCESS];
+Word korean[TOTAL_WORD];
+int root[EXTRACT_WORD + 1][EXTRACT_WORD + 1];
+int ordering_transla[EXTRACT_WORD];
+int count = 0;
+
+//Using Bubble sort to order word and probablity
+void OrderingFunction()
+{
+	char tmp[TOTAL_WORD];
+	int temp;
+
+	//Bubble sort
+	for (int i = 0; i < EXTRACT_WORD - 1; i++)
+	{
+		for (int j = 0; j < EXTRACT_WORD - 1 - i; j++)
+		{
+			if (strcmp(word[j][1].wor, word[j + 1][1].wor) == 1)
+			{
+				strcpy(tmp, word[j][1].wor);
+				strcpy(word[j][1].wor, word[j + 1][1].wor);
+				strcpy(word[j + 1][1].wor, tmp);
+
+				temp = word[j][1].proba;
+				word[j][1].proba = word[j + 1][1].proba;
+				word[j + 1][1].proba = temp;
+			}
+		}
+	}
+
+	//Ordering key
+	for (int i = 0; i <= EXTRACT_WORD; i++)
+	{
+		word[i][1].key = i ;
+	}
+}
+
+//This function reads "input.txt"file and generate distinct words with their frequency as follows. 
+void FrequencyGenerator()
+{
+	char str[MAX_WORD];
+	char* result;
+	int m = 0;
+
+	//Initialize processing
+	for (int i = 0; i < TOTAL_WORD; i++)
+	{
+		for (int j = 0; j <= PROCESS; j++)
+		{
+			strcpy(word[i][j].wor, " ");
+			word[i][j].proba = 0;
+		}	
+		word[i][1].key = 0;
+	}
+	fin = fopen("input.txt", "rt");
+	
+	if (fin == NULL) {
+		printf("Failed to open \n");
+		return;
+	}
+
+	while (feof(fin) == 0) {
+		fgets(str, MAX_WORD, fin);
+	}
+
+	result = strtok(str, " ");
+
+	while (result != NULL)
+	{
+		strcpy(word[m++][0].wor, result);
+		result = strtok(NULL, " ");
+	}
+
+	//It generates distinct words with their frequency.
+	for (int i = 0; i<TOTAL_WORD; i++)
+	{
+		for (int j = 0; j < EXTRACT_WORD; j++)
+		{
+			if (!strcmp(word[j][1].wor, word[i][0].wor))
+			{
+				word[j][1].proba++;
+				break;
+			}
+
+			if (!strcmp(word[j][1].wor, " "))
+			{
+				strcpy(word[j][1].wor, word[i][0].wor);
+				break;
+			}
+		}
+	}
+	fclose(fin);
+}
+
+//This function generates order sequence to translate
+void TranslateOrdering(int f, int l)
+{
+	int k;
+	if (f > l || l == 0)
+		return;
+	k = root[f][l];
+	printf("%d ", k);
+	ordering_transla[count++] = k;
+	TranslateOrdering(f, k - 1);
+	TranslateOrdering(k + 1, l);
+}
+
+//This function construct binary search tree using Dynamic Programming technique
+void ConstrutOptimalBinaryTree()
+{
+	int cost[EXTRACT_WORD + 1][EXTRACT_WORD + 1];
+
+	OrderingFunction();
+
+	for (int i = 0; i < EXTRACT_WORD + 1; i++)
+	{
+		for (int j = 0; j < EXTRACT_WORD + 1; j++)
+		{
+			root[i][j] = 0;
+		}
+	}
+
+	for (int i = 0; i <= EXTRACT_WORD; i++)
+	{
+		for (int j = 0; j <= EXTRACT_WORD; j++)
+		{
+			cost[i][j] = 0;
+		}
+	}
+
+	for (int i = 1; i <= EXTRACT_WORD; i++)
+	{
+		cost[i][i - 1] = 0;
+		cost[i][i] = word[i - 1][1].proba;
+		root[i][i] = i;
+	}
+	cost[EXTRACT_WORD + 1][EXTRACT_WORD] = 0;
+
+	for (int d = 1; d <= EXTRACT_WORD - 1; d++)
+	{
+		for (int i = 1; i <= EXTRACT_WORD - d; i++)
+		{
+			int j = i + d;
+			int minival = MAX_WORD;
+			int kmin;
+
+			for (int k = i; k <= j; k++)
+			{
+				if (cost[i][k - 1] + cost[k + 1][j] < minival)
+				{
+					minival = cost[i][k - 1] + cost[k + 1][j];
+					kmin = k;
+				}
+			}
+			root[i][j] = kmin;
+			int sum = word[i - 1][1].proba;
+		
+			for (int s = i + 1; s <= j; s++)
+			{
+				sum = sum + word[s - 1][1].proba;
+			}
+			cost[i][j] = minival + sum;
+		}
+	}
+
+	printf("\n\n");
+	printf("root matrix -> \n\n");
+	for (int i = 0; i <= EXTRACT_WORD; i++)
+	{
+		for (int j = 0; j <= EXTRACT_WORD; j++)
+		{
+			printf("%d ", root[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+
+	printf("Translating order ->\n\n ");
+	TranslateOrdering(1, EXTRACT_WORD);
+	printf("\n\n");
+}
+
+//This function is translating from English to Korean
+void TranslateKorean()
+{
+	for (int i = 0; i < EXTRACT_WORD; i++)
+	{
+		if (word[i][1].key == 0)
+			strcpy(korean[i].wor, "삼각근의");
+
+		else if (word[i][1].key == 1)
+			strcpy(korean[i].wor, "독감");
+
+		else if (word[i][1].key == 2)
+			strcpy(korean[i].wor, "비활성화의");
+
+		else if (word[i][1].key == 3)
+			strcpy(korean[i].wor, "감기");
+
+		else if (word[i][1].key == 4)
+			strcpy(korean[i].wor, "주사");
+
+		else if (word[i][1].key == 5)
+			strcpy(korean[i].wor, "피내의");
+
+		else if (word[i][1].key == 6)
+			strcpy(korean[i].wor, "근육내의");
+
+		else if (word[i][1].key == 7)
+			strcpy(korean[i].wor, "비강의");
+
+		else if (word[i][1].key == 8)
+			strcpy(korean[i].wor, "주사");
+
+		else if (word[i][1].key == 9)
+			strcpy(korean[i].wor, "스프레이");
+
+		else if (word[i][1].key == 10)
+			strcpy(korean[i].wor, "백신");
+
+		else if (word[i][1].key == 11)
+			strcpy(korean[i].wor, "바이러스");
+	}
+}
+
+//This function reads each English word from “input.txt” file 
+//and then find its  corresponding Korean word from the optimal binary search tree 
+//and then write the Korean word on the “ouput.txt “file
+void TranslateBySearching()
+{
+
+	TranslateKorean();
+
+	for (int i = 0; i < TOTAL_WORD; i++)
+	{
+		for (int j = 0; j < EXTRACT_WORD; j++)
+		{
+			if (strcmp(word[j][1].wor, word[i][0].wor) == 0)
+			{
+				word[i][0].key = word[j][1].key+1;
+			}
+		}
+	}
+
+	//translate processing
+	for (int i = 0; i < TOTAL_WORD; i++)
+	{	
+		for (int j = 0; j < EXTRACT_WORD; j++)
+			{
+			if (word[i][0].key == ordering_transla[j])
+			{
+				strcpy(word[i][0].wor, korean[ordering_transla[j]-1].wor);
+			}
+		}
+	}
+
+	fout = fopen("output.txt","wt");
+
+	if(fout == NULL)
+	{
+		printf(" Failed to open!\n");
+		return 1;
+	}
+
+	for (int i = 0; i < TOTAL_WORD; i++)
+	{
+		printf("%s ", word[i][0].wor);
+		fputs(word[i][0].wor,fout);
+		fputs(" ", fout);
+	}
+
+	fclose(fout);
+	printf("\n");
+}
+
+int main(void)
+{
+	FrequencyGenerator();
+	ConstrutOptimalBinaryTree();
+	TranslateBySearching();
+
+	return 0;
+}
